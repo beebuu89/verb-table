@@ -88,27 +88,12 @@
             font-style: italic;
             min-height: 24px;
         }
-        .review-box {
-            text-align: left;
-            background: #fff0f0;
-            border: 2px solid #ff6b6b;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 15px 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .review-item {
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #d63031;
-        }
     </style>
 </head>
 <body>
 
 <div class="game-container">
-    <h1>✏️ Fill in the Verb Table! ✏️</h1>
+    <h1 id="gameTitle">✏️ Fill in the Verb Table! ✏️</h1>
     <div class="score-board" id="scoreBoard">Score: 0 / 20</div>
 
     <div class="form-group">
@@ -132,7 +117,6 @@
 </div>
 
 <script>
-    // 包含全部 172 个动词的完整数据库 (Pages 1-6)
     const FULL_VERB_DATABASE = [
         ["answer", "answered", "answered"], ["ask", "asked", "asked"], ["call", "called", "called"],
         ["climb", "climbed", "climbed"], ["enjoy", "enjoyed", "enjoyed"], ["help", "helped", "helped"],
@@ -197,7 +181,8 @@
     let questions = [];
     let currentIndex = 0;
     let score = 0;
-    let wrongAnswers = []; // 用于收集错题
+    let wrongAnswers = []; 
+    let isReviewMode = false; // 标记当前是否处于错题重做模式
 
     function initGame() {
         let shuffled = [...FULL_VERB_DATABASE].sort(() => 0.5 - Math.random());
@@ -205,6 +190,8 @@
         currentIndex = 0;
         score = 0;
         wrongAnswers = [];
+        isReviewMode = false;
+        document.getElementById("gameTitle").textContent = "✏️ Fill in the Verb Table! ✏️";
         loadQuestion();
     }
 
@@ -214,10 +201,26 @@
             document.getElementById("pastInput").value = "";
             document.getElementById("ppInput").value = "";
             document.getElementById("feedback").textContent = "";
-            document.getElementById("scoreBoard").textContent = `Score: ${score} / 20`;
+            
+            if (!isReviewMode) {
+                document.getElementById("scoreBoard").textContent = `Score: ${score} / 20`;
+            } else {
+                document.getElementById("scoreBoard").textContent = `🔄 Mistake Review (${currentIndex + 1} / ${questions.length})`;
+            }
             document.getElementById("pastInput").focus();
         } else {
-            showFinalScore();
+            // 第一轮20题答完，检查是否有错题
+            if (!isReviewMode && wrongAnswers.length > 0) {
+                // 进入错题重做模式
+                isReviewMode = true;
+                questions = [...wrongAnswers]; // 把错题拿来当新题目
+                currentIndex = 0;
+                document.getElementById("gameTitle").textContent = "🔄 Redo Your Mistakes! 🔄";
+                alert(`You had ${questions.length} mistake(s). Let's practice them again!`);
+                loadQuestion();
+            } else {
+                showFinalScore();
+            }
         }
     }
 
@@ -236,19 +239,19 @@
         let feedback = document.getElementById("feedback");
 
         if (userPast === correctPast && userPP === correctPP) {
-            score++;
+            if (!isReviewMode) score++;
             feedback.style.color = "green";
             feedback.textContent = "🎉 Correct! Great job!";
             setTimeout(nextQuestion, 1200);
         } else {
-            // 记录错题：保存原形、你的回答、正确答案
-            wrongAnswers.push({
-                present: currentVerb[0],
-                userPast: userPast,
-                userPP: userPP,
-                correctPast: currentVerb[1],
-                correctPP: currentVerb[2]
-            });
+            // 如果在第一轮答错，收集进错题本
+            if (!isReviewMode) {
+                // 检查是否已经存在于错题本中，避免重复添加
+                let exists = wrongAnswers.some(item => item[0] === currentVerb[0]);
+                if (!exists) {
+                    wrongAnswers.push(currentVerb);
+                }
+            }
 
             feedback.style.color = "red";
             feedback.textContent = `❌ Correct was -> Past: ${correctPast}, PP: ${correctPP}`;
@@ -263,37 +266,14 @@
 
     function showFinalScore() {
         let container = document.querySelector(".game-container");
-        
-        let reviewHtml = "";
-        if (wrongAnswers.length > 0) {
-            reviewHtml = `
-                <div style="font-size: 16px; font-weight: bold; color: #d63031; margin-top: 10px; text-align: left;">📝 Mistakes to Review:</div>
-                <div class="review-box">
-            `;
-            wrongAnswers.forEach(item => {
-                reviewHtml += `
-                    <div class="review-item">
-                        <b>${item.present}</b><br>
-                        Your: ${item.userPast} / ${item.userPP}<br>
-                        <b>Correct: ${item.correctPay || item.correctPast} / ${item.correctPP}</b>
-                    </div><hr style="border:0; border-top:1px dashed #ffb8b8; margin:6px 0;">
-                `;
-            });
-            reviewHtml += `</div>`;
-        } else {
-            reviewHtml = `<div style="font-size: 16px; color: #2e8b57; font-weight: bold; margin: 15px 0;">🌟 Incredible! Zero mistakes! You got them all right! 🌟</div>`;
-        }
-
         container.innerHTML = `
             <h1>🏆 Quiz Completed! 🏆</h1>
-            <div style="font-size: 20px; color: #2e8b57; margin: 10px 0; font-weight: bold;">Your Final Score: ${score} / 20</div>
-            <p style="font-size: 14px; color: #555; margin: 5px 0;">${score === 20 ? "Amazing work! You're a grammar star! ⭐" : "Good effort! Check your mistakes below and try again!"}</p>
-            ${reviewHtml}
+            <div style="font-size: 20px; color: #2e8b57; margin: 15px 0; font-weight: bold;">Your Final Score: ${score} / 20</div>
+            <p style="font-size: 16px; color: #555; margin: 15px 0;">${score === 20 ? "Amazing work! You're a grammar star with zero mistakes! ⭐" : "Fantastic persistence! You've re-done and practiced all your mistakes! 👍"}</p>
             <button onclick="initGame()">Play Again (New Verbs!) 🔄</button>
         `;
     }
 
-    // 绑定回车键直接跳转与提交
     document.getElementById("pastInput").addEventListener("keypress", function(e) {
         if (e.key === "Enter") {
             document.getElementById("ppInput").focus();
@@ -306,7 +286,6 @@
         }
     });
 
-    // 启动游戏
     initGame();
 </script>
 
